@@ -40,32 +40,56 @@ def add_yes_option(parser):
                         help="Don't ask for confirmation")
 
 def add_fields_option(parser):
-    parser.add_argument("-f", "--fields", nargs="+",
+    parser.add_argument("-f", "--fields", metavar="FIELD1,FIELD2,...",
                         help="Which metadata fields to include")
 
 def add_match_options(parser):
-    parser.add_argument("-m", "--match", nargs="*", metavar="FIELD=EXPR",
+    parser.add_argument("-m", "--match", metavar="FIELD=EXPR", action="append",
                         help="Filter songs")
-    parser.add_argument("--match-literal", nargs="*", metavar="FIELD=VALUE",
-                        help="Filter songs by literal match")
-    parser.add_argument("--match-set", nargs="*",
-                        metavar="FIELD=VALUE1,VALUE2,...",
-                        help="Filter songs by set membership")
-    parser.add_argument("--match-range", nargs="*", metavar="FIELD=LOW-HIGH",
+    parser.add_argument("--match-literal", metavar="FIELD=VALUE",
+                        action="append", help="Filter songs by literal match")
+    parser.add_argument("--match-set", metavar="FIELD=VALUE1,VALUE2,...",
+                        action="append", help="Filter songs by set membership")
+    parser.add_argument("--match-range", metavar="FIELD=LOW-HIGH",
+                        action="append",
                         help="Filter songs by range inclusion")
-    parser.add_argument("--match-all", nargs="*",
+    parser.add_argument("--match-all", metavar="FIELD", action="append",
                         help="Do not filter songs")
 
-    parser.add_argument("--set-delimiter", default=",",
+    parser.add_argument("--set-delimiter", default=",", metavar="DELIM",
                         help="Delimiter to use for set filtering")
-    parser.add_argument("--range-delimiter", default="-",
+    parser.add_argument("--range-delimiter", default="-", metavar="DELIM",
                         help="Delimiter to use for range filtering")
 
+SORT_OPTION_STRINGS = ("-s", "--sort")
+REVERSE_OPTION_STRINGS = ("-r", "--reverse")
+SHUFFLE_OPTION_STRINGS = ("-x", "--shuffle")
+
+class SortAction(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string):
+        if option_string in SORT_OPTION_STRINGS:
+            modifier = "sort"
+        elif option_string in REVERSE_OPTION_STRINGS:
+            modifier = "reverse"
+        elif option_string in SHUFFLE_OPTION_STRINGS:
+            modifier = "shuffle"
+        else:
+            assert False, "unexpected modifier: {}".format(modifier)
+        if not hasattr(namespace, "sort"):
+            namespace.sort = []
+        for value in values:
+            namespace.sort.append({
+                "field": value,
+                "modifier": modifier,
+            })
+
 def add_sort_options(parser):
-    parser.add_argument("-s", "--sort", nargs="*", help="Sort by field")
-    parser.add_argument("-r", "--reverse", nargs="*",
+    parser.add_argument(*SORT_OPTION_STRINGS, action=SortAction,
+                        help="Sort by field")
+    parser.add_argument(*REVERSE_OPTION_STRINGS, action=SortAction,
                         help="Sort by field in reverse order")
-    parser.add_argument("-x", "--shuffle", nargs="*",
+    parser.add_argument(*SHUFFLE_OPTION_STRINGS, action=SortAction,
                         help="Shuffle by field")
 
 def get_parser():
@@ -116,7 +140,7 @@ def get_parser():
     parser_insert.add_argument(
         "playlist", help="Name of playlist in which to insert")
     parser_insert.add_argument(
-        "index", help="Index at which to insert")
+        "index", type=int, help="Index at which to insert")
 
     parser_remove = subparsers.add_parser(
         "remove", help="Remove songs from a playlist or the queue")
@@ -153,7 +177,7 @@ def get_parser():
         "-P", "--pause", action="store_true", help="Stop playing")
 
     parser_seek.add_argument(
-        "index", nargs="?", help="Relative index to which to seek")
+        "index", type=int, nargs="?", help="Relative index to which to seek")
 
     return parser
 
