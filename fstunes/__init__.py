@@ -37,7 +37,7 @@ def get_parser():
     parser = argparse.ArgumentParser(
         description=(
             "Minimal command-line music library manager and media player."))
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(dest="subcommand")
 
     parser_import = subparsers.add_parser(
         "import", help="Add media files to library")
@@ -46,7 +46,8 @@ def get_parser():
 
     parser_playlist = subparsers.add_parser(
         "playlist", help="Create or delete playlists")
-    subparsers_playlist = parser_playlist.add_subparsers()
+    subparsers_playlist = parser_playlist.add_subparsers(
+        dest="subcommand_playlist")
 
     parser_playlist_create = subparsers_playlist.add_parser(
         "create", help="Create a playlist")
