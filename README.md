@@ -108,3 +108,23 @@ Special values for `from` are `library` and `queue`.
         [-P, --pause]
         [-a, --absolute]
         INDEX
+
+## Filesystem layout
+
+Set `$FSTUNES_HOME` in the environment. The containing directory must
+exist.
+
+    FSTUNES_HOME
+        edit
+        logs
+        media
+            ARTIST
+                ALBUM
+                    DISK-TRACK SONG.EXT
+        playlists
+            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXT
+            ...
+        queue
+            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXT
+            ...
+        temp
