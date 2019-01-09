@@ -21,10 +21,14 @@ def die(message=None, *args, **kwargs):
         log(message, *args, **kwargs)
     sys.exit(1)
 
-def are_you_sure(default):
+def are_you_sure(default, yes):
     prompt = "[Y/n]" if default else "[y/N]"
     print("Proceed? {} ".format(prompt), end="")
-    response = input()
+    if yes:
+        response = "yes (from command-line options)"
+        print(response)
+    else:
+        response = input()
     if response.lower().startswith("y"):
         return True
     if response.lower().startswith("n"):
@@ -334,7 +338,7 @@ def delete_playlists(playlists, env, yes):
     log("will delete the following {} playlist{} with {} total songs:{}"
         .format(len(paths), plural(len(paths)),
                 total_songs, "".join(deletion_list)))
-    if not are_you_sure(default=total_songs == 0):
+    if not are_you_sure(default=total_songs == 0, yes=yes):
         die()
     for path in paths:
         shutil.rmtree(path)
