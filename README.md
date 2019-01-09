@@ -56,8 +56,9 @@ subcommands:
         [--before | --after]
         PLAYLIST INDEX
 
-`FIELD` may be `artist`, `album`, `disk`, `track`, `song`, `ext`, or
-`from`. Special values for `from` are `media` and `queue`.
+`FIELD` may be `artist`, `album`, `disk`, `track`, `song`,
+`extension`, or `from`. Special values for `from` are `media` and
+`queue`.
 
 ### remove
 
@@ -130,11 +131,11 @@ exist.
         media
             ARTIST
                 ALBUM
-                    DISK-TRACK SONG.EXT
+                    DISK-TRACK SONG.EXTENSION
         playlists
-            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXT
+            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXTENSION
             ...
         queue
-            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXT
+            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXTENSION
             ...
         temp
