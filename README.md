@@ -118,11 +118,7 @@ subcommands:
 
 ### seek
 
-    $ fstunes seek
-        [-p, --play]
-        [-P, --pause]
-        [-a, --absolute]
-        INDEX
+    $ fstunes seek [-p, --play | -P, --pause] [INDEX]
 
 ## Filesystem layout
 
