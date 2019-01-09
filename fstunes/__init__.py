@@ -251,6 +251,8 @@ def import_music(paths, env):
     for path in paths:
         path = pathlib.Path(path).resolve()
         for dirpath, dirnames, filenames in os.walk(path):
+            dirnames.sort()
+            filenames.sort()
             already_reported_dir = False
             for filename in filenames:
                 filepath = pathlib.Path(dirpath) / filename
