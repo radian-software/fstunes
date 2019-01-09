@@ -25,7 +25,7 @@ def are_you_sure(default, yes):
     prompt = "[Y/n]" if default else "[y/N]"
     print("Proceed? {} ".format(prompt), end="")
     if yes:
-        response = "yes (from command-line options)"
+        response = "y (from command-line options)"
         print(response)
     else:
         response = input()
