@@ -79,7 +79,6 @@ def get_parser():
     add_match_options(parser_list)
     add_sort_options(parser_list)
     add_fields_option(parser_list)
-    parser_list.add_argument("-o", "--overview", action="store_true")
 
     parser_delete = subparsers.add_parser(
         "delete", help="Delete media files from library")

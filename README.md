@@ -102,7 +102,6 @@ subcommands:
         [-r, --reverse FIELD]
         [-x, --shuffle FIELD]
         [-f, --fields FIELD1,FIELD2,...]
-        [-o, --overview]
 
 ### delete
 
