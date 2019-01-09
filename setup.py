@@ -8,6 +8,7 @@ setup(
     license="MIT",
     install_requires=[],
     name="fstunes",
+    scripts=["scripts/fstunes"],
     url="https://github.com/raxod502/fstunes",
     version="0.0-dev",
 )

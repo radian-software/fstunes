@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+
+import fstunes
+
+if __name__ == "__main__":
+    fstunes.main()
