@@ -6,7 +6,7 @@ setup(
     author_email="radon.neon@gmail.com",
     description="Minimal command-line music library manager and media player.",
     license="MIT",
-    install_requires=[],
+    install_requires=["mutagen"],
     name="fstunes",
     scripts=["scripts/fstunes"],
     url="https://github.com/raxod502/fstunes",

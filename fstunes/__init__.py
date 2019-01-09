@@ -1,4 +1,18 @@
 import argparse
+import mutagen
+import os
+import pathlib
+import re
+import shutil
+import string
+import sys
+
+def log(message, *args, **kwargs):
+    print("fstunes: {}".format(message), *args, file=sys.stderr, **kwargs)
+
+def die(message, *args, **kwargs):
+    log(message, *args, **kwargs)
+    sys.exit(1)
 
 def add_yes_option(parser):
     parser.add_argument("-y", "--yes", action="store_true",
@@ -122,6 +136,163 @@ def get_parser():
 
     return parser
 
+def read_mutagen_key(m, key):
+    try:
+        return ", ".join(m[key].text) or None
+    except KeyError:
+        return None
+
+def read_metadata(filepath):
+    m = mutagen.File(filepath)
+    metadata = {}
+    metadata["artist"] = (read_mutagen_key(m, "TPE2") or
+                          read_mutagen_key(m, "TPE1"))
+    metadata["album"] = read_mutagen_key(m, "TALB")
+    metadata["disk"] = None
+    disk_and_total = read_mutagen_key(m, "TPOS")
+    if disk_and_total:
+        match = re.match(r"[0-9]+", disk_and_total)
+        if match:
+            metadata["disk"] = int(match.group())
+    metadata["track"] = None
+    track_and_total = read_mutagen_key(m, "TRCK")
+    if track_and_total:
+        match = re.match(r"[0-9]+", track_and_total)
+        if match:
+            metadata["track"] = int(match.group())
+    metadata["song"] = read_mutagen_key(m, "TIT2")
+    metadata["extension"] = filepath.suffix
+    return metadata
+
+SAFE_CHARS = (
+    string.ascii_letters + string.digits + " !\"$%&'()*+,-.[]^_`{|}~")
+ESCAPE_CHAR = "#"
+
+def escape_string(s):
+    results = []
+    for char in s:
+        if char in SAFE_CHARS:
+            results.append(char)
+        else:
+            results.append("{0}{1:x}{0}".format(ESCAPE_CHAR, ord(char)))
+    return "".join(results)
+
+def unescape_string(s):
+    return re.sub(r"#([0-9a-f]+)#", lambda m: chr(int(m.group(1), base=16)), s)
+
+MISSING_FIELD = "---"
+
+def create_relpath(metadata):
+    disk_str = (
+        "{}-".format(metadata["disk"]) if "disk" in metadata else "")
+    return pathlib.Path("{}/{}/{}{} {}{}".format(
+        escape_string(metadata["artist"] or MISSING_FIELD),
+        escape_string(metadata["album"] or MISSING_FIELD),
+        disk_str,
+        metadata.get("track", ""),
+        escape_string(metadata.get("song") or MISSING_FIELD),
+        metadata["extension"]))
+
+def parse_relpath(relpath):
+    match = re.fullmatch(
+        r"([^/]+)/([^/]+)/(?:([0-9]+)-)?([0-9]+)? (.+)", relpath)
+    artist = unescape_string(match.group(1))
+    if artist == MISSING_FIELD:
+        artist = None
+    album = unescape_string(match.group(2))
+    if album == MISSING_FIELD:
+        album = None
+    disk = match.group(3)
+    if disk:
+        disk = int(disk)
+    track = match.group(4)
+    if track:
+        track = int(track)
+    song_and_extension = match.group(5)
+    song_match = re.fullmatch(r"(.+?)(\..*)", song_and_extension)
+    if song_match:
+        song, extension = song_match.groups()
+    else:
+        song = song_and_extension
+    song = unescape_string(song)
+    if song == MISSING_FIELD:
+        song = None
+    extension = match.group(6)
+    return {
+        "artist": artist,
+        "album": album,
+        "disk": disk,
+        "track": track,
+        "song": song,
+        "extension": extension,
+    }
+
+def import_song(filepath, env):
+    metadata = read_metadata(filepath)
+    relpath = create_relpath(metadata)
+    target = env["media"] / relpath
+    if target.exists() or target.is_symlink():
+        log("skipping, already exists: {} => {}"
+            .format(filepath, target))
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(filepath, target)
+    return True
+
+def plural(n):
+    return "s" if n != 1 else ""
+
+MEDIA_EXTENSIONS = [".mp3"]
+
+def import_music(paths, env):
+    copied = 0
+    already_present = 0
+    skipped = 0
+    for path in paths:
+        path = pathlib.Path(path).resolve()
+        for dirpath, dirnames, filenames in os.walk(path):
+            already_reported_dir = False
+            for filename in filenames:
+                filepath = pathlib.Path(dirpath) / filename
+                suffix = filepath.suffix
+                if suffix not in MEDIA_EXTENSIONS:
+                    log("skipping, extension {} not recognized: {}"
+                        .format(repr(suffix), filepath))
+                    skipped += 1
+                    continue
+                if not already_reported_dir:
+                    log("importing media from directory: {}"
+                        .format(filepath.parent))
+                    already_reported_dir = True
+                if import_song(filepath, env):
+                    copied += 1
+                else:
+                    already_present += 1
+    log(("imported {} media file{}, skipped {} "
+         "already present and {} unrecognized")
+        .format(copied, plural(copied), already_present, skipped))
+
+FSTUNES_HOME_ENV_VAR = "FSTUNES_HOME"
+
+def handle_args(args):
+    home = os.environ.get(FSTUNES_HOME_ENV_VAR)
+    if not home:
+        die("environment variable not set: {}".format(FSTUNES_HOME_ENV_VAR))
+    home = pathlib.Path(home)
+    if not home.is_dir():
+        if home.exists() or home.is_symlink():
+            die("not a directory: {}".format(home))
+        die("directory does not exist: {}".format(home))
+    env = {
+        "home": home,
+        "media": home / "media",
+    }
+    if args.subcommand == "import":
+        import_music(args.paths, env)
+    else:
+        die("not yet implemented: {}".format(args.subcommand))
+
 def main():
     parser = get_parser()
-    parser.parse_args()
+    args = parser.parse_args()
+    handle_args(args)
