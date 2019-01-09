@@ -42,7 +42,7 @@ def get_parser():
     parser_import = subparsers.add_parser(
         "import", help="Add media files to library")
     parser_import.add_argument(
-        "path", nargs="+", help="Media file or directory")
+        "paths", nargs="+", metavar="path", help="Media file or directory")
 
     parser_playlist = subparsers.add_parser(
         "playlist", help="Create or delete playlists")
@@ -51,12 +51,14 @@ def get_parser():
     parser_playlist_create = subparsers_playlist.add_parser(
         "create", help="Create a playlist")
     parser_playlist_create.add_argument(
-        "playlist", nargs="+", help="Name of playlist to create")
+        "playlists", nargs="+", metavar="playlist",
+        help="Name of playlist to create")
 
     parser_playlist_delete = subparsers_playlist.add_parser(
         "delete", help="Delete a playlist")
     parser_playlist_delete.add_argument(
-        "playlist", nargs="+", help="Name of playlist to delete")
+        "playlists", nargs="+", metavar="playlist",
+        help="Name of playlist to delete")
     add_yes_option(parser_playlist_delete)
 
     parser_insert = subparsers.add_parser(
