@@ -41,10 +41,13 @@ subcommands:
 ### insert
 
     $ fstunes insert
-        [-m, --match FIELD=VALUE]              # literal match
-        [-m, --match FIELD=VALUE1,VALUE2,...]  # set match
-        [-m, --match FIELD=LOW-HIGH]           # range match
-        [-m, --match FIELD=all]                # no filter
+        [-m, --match FIELD=EXPR]
+        [    --match-literal FIELD=VALUE]
+        [    --match-set FIELD=VALUE1,VALUE2,...]
+        [    --match-range FIELD=LOW-HIGH]
+        [    --match-all]
+        [    --set-delimiter DELIM]
+        [    --range-delimiter DELIM]
         [-s, --sort FIELD]
         [-r, --reverse FIELD]
         [-x, --shuffle FIELD]
@@ -53,25 +56,31 @@ subcommands:
         [--before | --after]
         PLAYLIST INDEX
 
-`FIELD` may be `artist`, `album`, `disk`, `track`, `song`, or `from`.
-Special values for `from` are `library` and `queue`.
+`FIELD` may be `artist`, `album`, `disk`, `track`, `song`, `ext`, or
+`from`. Special values for `from` are `media` and `queue`.
 
 ### remove
 
     $ fstunes remove
-        [-m, --match FIELD=VALUE]              # literal match
-        [-m, --match FIELD=VALUE1,VALUE2,...]  # set match
-        [-m, --match FIELD=LOW-HIGH]           # range match
-        [-m, --match FIELD=all]                # no filter
+        [-m, --match FIELD=EXPR]
+        [    --match-literal FIELD=VALUE]
+        [    --match-set FIELD=VALUE1,VALUE2,...]
+        [    --match-range FIELD=LOW-HIGH]
+        [    --match-all]
+        [    --set-delimiter DELIM]
+        [    --range-delimiter DELIM]
         [-y, --yes]
 
 ### edit
 
     $ fstunes edit
-        [-m, --match FIELD=VALUE]              # literal match
-        [-m, --match FIELD=VALUE1,VALUE2,...]  # set match
-        [-m, --match FIELD=LOW-HIGH]           # range match
-        [-m, --match FIELD=all]                # no filter
+        [-m, --match FIELD=EXPR]
+        [    --match-literal FIELD=VALUE]
+        [    --match-set FIELD=VALUE1,VALUE2,...]
+        [    --match-range FIELD=LOW-HIGH]
+        [    --match-all]
+        [    --set-delimiter DELIM]
+        [    --range-delimiter DELIM]
         [-s, --sort FIELD]
         [-r, --reverse FIELD]
         [-x, --shuffle FIELD]
@@ -82,10 +91,13 @@ Special values for `from` are `library` and `queue`.
 ### list
 
     $ fstunes list
-        [-m, --match FIELD=VALUE]              # literal match
-        [-m, --match FIELD=VALUE1,VALUE2,...]  # set match
-        [-m, --match FIELD=LOW-HIGH]           # range match
-        [-m, --match FIELD=all]                # no filter
+        [-m, --match FIELD=EXPR]
+        [    --match-literal FIELD=VALUE]
+        [    --match-set FIELD=VALUE1,VALUE2,...]
+        [    --match-range FIELD=LOW-HIGH]
+        [    --match-all]
+        [    --set-delimiter DELIM]
+        [    --range-delimiter DELIM]
         [-s, --sort FIELD]
         [-r, --reverse FIELD]
         [-x, --shuffle FIELD]
@@ -95,10 +107,13 @@ Special values for `from` are `library` and `queue`.
 ### delete
 
     $ fstunes delete
-        [-m, --match FIELD=VALUE]              # literal match
-        [-m, --match FIELD=VALUE1,VALUE2,...]  # set match
-        [-m, --match FIELD=LOW-HIGH]           # range match
-        [-m, --match FIELD=all]                # no filter
+        [-m, --match FIELD=EXPR]
+        [    --match-literal FIELD=VALUE]
+        [    --match-set FIELD=VALUE1,VALUE2,...]
+        [    --match-range FIELD=LOW-HIGH]
+        [    --match-all]
+        [    --set-delimiter DELIM]
+        [    --range-delimiter DELIM]
         [-y, --yes]
 
 ### seek
