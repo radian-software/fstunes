@@ -7,6 +7,12 @@ import shutil
 import string
 import sys
 
+def has_duplicates(l):
+    return len(l) != len(set(l))
+
+def iter_len(iterable):
+    return sum(1 for _ in iterable)
+
 def log(message, *args, **kwargs):
     print("fstunes: {}".format(message), *args, file=sys.stderr, **kwargs)
 
@@ -14,6 +20,16 @@ def die(message=None, *args, **kwargs):
     if message is not None:
         log(message, *args, **kwargs)
     sys.exit(1)
+
+def are_you_sure(default):
+    prompt = "[Y/n]" if default else "[y/N]"
+    print("Proceed? {} ".format(prompt), end="")
+    response = input()
+    if response.lower().startswith("y"):
+        return True
+    if response.lower().startswith("n"):
+        return False
+    return default
 
 def add_yes_option(parser):
     parser.add_argument("-y", "--yes", action="store_true",
@@ -275,6 +291,55 @@ def import_music(paths, env):
          "already present and {} unrecognized")
         .format(copied, plural(copied), already_present, skipped))
 
+def create_playlists(playlists, env):
+    if has_duplicates(playlists):
+        die("more than one playlist with the same name")
+    paths = [env["playlists"] / escape_string(p) for p in playlists]
+    should_die = False
+    for playlist, path in zip(playlists, paths):
+        if path.exists() or path.is_symlink():
+            if path.is_dir():
+                log("playlist already exists: {}".format(playlist))
+            else:
+                log("already exists and not a directory: {}".format(path))
+            should_die = True
+    if should_die:
+        die()
+    for path in paths:
+        path.mkdir(parents=True)
+    log("created {} playlist{}".format(len(playlists), plural(len(playlists))))
+
+def delete_playlists(playlists, env, yes):
+    if has_duplicates(playlists):
+        die("more than one playlist with the same name")
+    paths = [env["playlists"] / escape_string(p) for p in playlists]
+    should_die = False
+    for playlist, path in zip(playlists, paths):
+        if not path.is_dir():
+            if path.exists() or path.is_symlink():
+                log("already exists and not a directory: {}".format(path))
+            else:
+                log("playlist does not exist: {}".format(playlist))
+            should_die = True
+    if should_die:
+        die()
+    total_songs = 0
+    deletion_list = []
+    for playlist, path in zip(playlists, paths):
+        num_songs = iter_len(path.iterdir())
+        total_songs += num_songs
+        deletion_list.append(
+            "\n  {} ({} song{})"
+            .format(playlist, num_songs, plural(num_songs)))
+    log("will delete the following {} playlist{} with {} total songs:{}"
+        .format(len(paths), plural(len(paths)),
+                total_songs, "".join(deletion_list)))
+    if not are_you_sure(default=total_songs == 0):
+        die()
+    for path in paths:
+        shutil.rmtree(path)
+    log("deleted {} playlist{}".format(len(playlists), plural(len(playlists))))
+
 FSTUNES_HOME_ENV_VAR = "FSTUNES_HOME"
 
 def handle_args(args):
@@ -289,9 +354,15 @@ def handle_args(args):
     env = {
         "home": home,
         "media": home / "media",
+        "playlists": home / "playlists",
     }
     if args.subcommand == "import":
         import_music(args.paths, env)
+    elif args.subcommand == "playlist":
+        if args.subcommand_playlist == "create":
+            create_playlists(args.playlists, env)
+        else:
+            delete_playlists(args.playlists, env, yes=args.yes)
     else:
         die("not yet implemented: {}".format(args.subcommand))
 
