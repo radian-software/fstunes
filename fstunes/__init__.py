@@ -10,8 +10,9 @@ import sys
 def log(message, *args, **kwargs):
     print("fstunes: {}".format(message), *args, file=sys.stderr, **kwargs)
 
-def die(message, *args, **kwargs):
-    log(message, *args, **kwargs)
+def die(message=None, *args, **kwargs):
+    if message is not None:
+        log(message, *args, **kwargs)
     sys.exit(1)
 
 def add_yes_option(parser):
