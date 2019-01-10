@@ -33,6 +33,8 @@ def log(message, *args, **kwargs):
     print("fstunes: {}".format(message), *args, file=sys.stderr, **kwargs)
 
 def die(message=None, *args, **kwargs):
+    if os.environ.get("FSTUNES_DEBUG"):
+        assert False, "stacktrace requested"
     if message is not None:
         log(message, *args, **kwargs)
     sys.exit(1)
@@ -83,7 +85,7 @@ SHUFFLE_OPTION_STRINGS = ("-x", "--shuffle")
 
 class SortAction(argparse.Action):
 
-    def __call__(self, parser, namespace, values, option_string):
+    def __call__(self, parser, namespace, value, option_string):
         if option_string in SORT_OPTION_STRINGS:
             modifier = "sort"
         elif option_string in REVERSE_OPTION_STRINGS:
@@ -92,13 +94,12 @@ class SortAction(argparse.Action):
             modifier = "shuffle"
         else:
             assert False, "unexpected modifier: {}".format(modifier)
-        if not hasattr(namespace, "sort"):
+        if namespace.sort is None:
             namespace.sort = []
-        for value in values:
-            namespace.sort.append({
-                "field": value,
-                "modifier": modifier,
-            })
+        namespace.sort.append({
+            "field": value,
+            "modifier": modifier,
+        })
 
 def add_sort_options(parser):
     parser.add_argument(*SORT_OPTION_STRINGS, action=SortAction,
@@ -148,10 +149,10 @@ def get_parser():
 
     group_insert_before = parser_insert.add_mutually_exclusive_group()
     group_insert_before.add_argument(
-        "--before", action="store_false", help="Insert before given index")
-    group_insert_before.add_argument(
-        "--after", action="store_true", dest="before",
+        "--after", action="store_false", dest="before",
         help="Insert after given index")
+    group_insert_before.add_argument(
+        "--before", action="store_true", help="Insert before given index")
 
     parser_insert.add_argument(
         "playlist", help="Name of playlist in which to insert")
@@ -256,7 +257,7 @@ def create_relpath(metadata):
 
 def parse_relpath(relpath):
     match = re.fullmatch(
-        r"([^/]+)/([^/]+)/(?:([0-9]+)-)?([0-9]+)? (.+)", relpath)
+        r"([^/]+)/([^/]+)/(?:([0-9]+)-)?([0-9]+)? (.+)", str(relpath))
     artist = unescape_string(match.group(1))
     if artist == MISSING_FIELD:
         artist = None
@@ -275,10 +276,10 @@ def parse_relpath(relpath):
         song, extension = song_match.groups()
     else:
         song = song_and_extension
+        extension = ""
     song = unescape_string(song)
     if song == MISSING_FIELD:
         song = None
-    extension = match.group(6)
     return {
         "artist": artist,
         "album": album,
@@ -425,48 +426,95 @@ assert set(METADATA_INT_FIELDS).issubset(set(METADATA_FIELDS))
 def split_matcher(matcher):
     return matcher.split("=", maxsplit=1)
 
+def combine_matchers(true_matchers, false_matchers):
+    return ([(True, t) for t in true_matchers] +
+            [(False, f) for f in false_matchers])
+
 def parse_matchers(args, default_to_media):
+    match = args.match or []
+    match_literal = args.match_literal or []
+    match_set = args.match_set or []
+    match_range = args.match_range or []
+    match_all = args.match_all or []
     matchers = collections.defaultdict(list)
     for matcher_type, unparsed_matchers in (
-            ("literal", args.match_literal + args.match),
-            ("set", args.match_set + args.match),
-            ("range", args.match_range + args.match),
-            ("all", args.match_all)):
+            ("guess", match),
+            ("literal", match_literal),
+            ("set", match_set),
+            ("range", match_range),
+            ("all", match_all)):
         for unparsed_matcher in unparsed_matchers:
-            field, expr = unparsed_matcher.split("=", maxsplit=1)
+            if matcher_type != "all":
+                try:
+                    field, orig_expr = unparsed_matcher.split("=", maxsplit=1)
+                except ValueError:
+                    die("invalid match expression: {}"
+                        .format(unparsed_matcher))
+            else:
+                field = unparsed_matcher
             if field not in METADATA_FIELDS:
                 die("unsupported field: {}".format(field))
-            desc = {
-                "type": matcher_type,
-            }
-            if matcher_type == "literal":
-                if field in METADATA_INT_FIELDS:
-                    try:
-                        expr = int(expr)
-                    except ValueError:
-                        die("invalid integer literal: {}".format(expr))
-                desc["value"] = expr
-            elif matcher_type == "set":
-                expr.split(args.set_delimiter)
-                try:
-                    expr = list(map(int, expr))
-                except ValueError:
-                    die("invalid integer set: {}".format(expr))
-                desc["values"] = expr
-            elif matcher_type == "range":
-                low, high = expr.split(args.range_delimiter, maxsplit=1)
-                try:
-                    low = int(low)
-                    high = int(high)
-                except ValueError:
-                    die("invalid integer range: {}".format(expr))
-                desc["low"] = low
-                desc["high"] = high
-            elif matcher_type == "all":
-                pass
-            else:
+            desc = {}
+            if matcher_type not in ("guess", "literal", "set", "range", "all"):
                 assert False, (
                     "unexpected matcher type: {}".format(matcher_type))
+            if matcher_type in ("literal", "guess") and "type" not in desc:
+                skip = False
+                expr = orig_expr
+                if field in METADATA_INT_FIELDS:
+                    try:
+                        expr = int(orig_expr)
+                    except ValueError:
+                        if matcher_type != "guess":
+                            die("invalid integer literal: {}"
+                                .format(orig_expr))
+                        else:
+                            skip = True
+                if not skip:
+                    desc["type"] = "literal"
+                    desc["value"] = expr
+            if matcher_type in ("set", "guess") and "type" not in desc:
+                skip = False
+                expr = orig_expr.split(args.set_delimiter)
+                if field in METADATA_INT_FIELDS:
+                    try:
+                        expr = list(map(int, expr))
+                    except ValueError:
+                        if matcher_type != "guess":
+                            die("invalid integer set: {}".format(orig_expr))
+                        else:
+                            skip = True
+                if not skip:
+                    desc["type"] = "set"
+                    desc["values"] = expr
+            if matcher_type in ("range", "guess") and "type" not in desc:
+                skip = False
+                try:
+                    low, high = orig_expr.split(
+                        args.range_delimiter, maxsplit=1)
+                except ValueError:
+                    if matcher_type != "guess":
+                        die("invalid range (does not contain {}): {}"
+                            .format(repr(args.range_delimiter), orig_expr))
+                    else:
+                        skip = True
+                if not skip and field in METADATA_INT_FIELDS:
+                    try:
+                        low = int(low)
+                        high = int(high)
+                    except ValueError:
+                        if matcher_type != "guess":
+                            die("invalid integer range: {}".format(orig_expr))
+                        else:
+                            skip = True
+                if not skip:
+                    desc["type"] = "range"
+                    desc["low"] = low
+                    desc["high"] = high
+            if matcher_type == "all" and "type" not in desc:
+                desc["type"] = "all"
+            if "type" not in desc:
+                die("invalid match expression: {}".format(orig_expr))
             matchers[field].append(desc)
     if not matchers["from"]:
         if default_to_media:
@@ -480,11 +528,18 @@ def parse_matchers(args, default_to_media):
 
 def parse_sorters(args):
     sorters = []
-    for sorter in args.sort:
-        field = sorted["field"]
+    for sorter in args.sort or []:
+        field = sorter["field"]
         if field not in METADATA_FIELDS:
             die("unsupported field: {}".format(field))
         sorters.append(dict(sorter))
+    for field in (
+            "from", "index", "artist", "album", "disk", "track",
+            "song", "extension"):
+        sorters.append({
+            "field": field,
+            "modifier": "sort",
+        })
     sorters.reverse()
     return sorters
 
@@ -503,20 +558,31 @@ def apply_matchers(matchers, value):
                 return True
         else:
             assert False, "unexpected matcher type: {}".format(matcher["type"])
-        return False
+    return not matchers
 
 def get_queue_index(env):
     try:
-        index = os.readlink(env["queue_current"])
-    except OSError:
+        index = int(os.readlink(env["queue_current"]))
+    except (OSError, ValueError):
         min_value = math.inf
-        for entry_path in env["queue"].iterdir():
-            try:
-                min_value = min(min_value, int(entry_path.name))
-            except ValueError:
-                continue
+        try:
+            for entry_path in env["queue"].iterdir():
+                try:
+                    min_value = min(min_value, int(entry_path.name))
+                except ValueError:
+                    continue
+        except OSError:
+            pass
         index = min_value if min_value != math.inf else 0
     return index
+
+def set_queue_index(env, index):
+    queue_current_path = env["queue_current"]
+    queue_current_path.parent.mkdir(parents=True, exist_ok=True)
+    queue_current_path_new = env["temp"] / env["queue_current"].name
+    queue_current_path_new.parent.mkdir(parents=True, exist_ok=True)
+    queue_current_path_new.symlink_to(str(index))
+    queue_current_path_new.rename(queue_current_path)
 
 def collect_matched_songs(env, matchers):
     songs = []
@@ -524,25 +590,25 @@ def collect_matched_songs(env, matchers):
         apply_matchers(matchers["from"], MEDIA_PLAYLIST) and
         env["media"].is_dir())
     if matches_media:
-        for artist_path in sorted(env["media"].iterdir()):
+        for artist_path in env["media"].iterdir():
             artist = unescape_string(artist_path.name)
             if not apply_matchers(matchers["artist"], artist):
                 continue
             if not artist_path.is_dir():
                 continue
-            for album_path in sorted(artist_path.iterdir()):
+            for album_path in artist_path.iterdir():
                 album = unescape_string(album_path.name)
                 if not apply_matchers(matchers["album"], album):
                     continue
                 if not album_path.is_dir():
                     continue
-                for song_path in sorted(album_path.iterdir()):
+                for song_path in album_path.iterdir():
                     if song_path.suffix not in MEDIA_EXTENSIONS:
                         continue
                     if not song_path.is_file():
                         continue
-                    metadata = parse_relpath(
-                        song_path.relative_to(env["media"]))
+                    relpath = song_path.relative_to(env["media"])
+                    metadata = parse_relpath(relpath)
                     disqualified = False
                     for field in ("disk", "track", "song", "extension"):
                         if not apply_matchers(
@@ -551,40 +617,42 @@ def collect_matched_songs(env, matchers):
                             break
                     if disqualified:
                         continue
+                    metadata["relpath"] = relpath
                     songs.append(metadata)
-    for playlist_path in sorted(env["playlists"].iterdir()):
-        playlist = unescape_string(playlist_path.name)
-        if not apply_matchers(matchers["from"], playlist):
-            continue
-        if not playlist_path.is_dir():
-            continue
-        offset = get_queue_index(env) if playlist == QUEUE_PLAYLIST else 0
-        for entry_path in sorted(playlist_path.iterdir()):
-            try:
-                index = int(entry_path.name)
-            except ValueError:
+    if env["playlists"].is_dir():
+        for playlist_path in env["playlists"].iterdir():
+            playlist = unescape_string(playlist_path.name)
+            if not apply_matchers(matchers["from"], playlist):
                 continue
-            index += offset
-            if not apply_matchers(matchers["index"], index):
+            if not playlist_path.is_dir():
                 continue
-            if not entry_path.is_symlink():
-                continue
-            song_path = entry_path.resolve()
-            relpath = song_path.relative_to(env["media"])
-            metadata = parse_relpath(relpath)
-            disqualified = False
-            for field in ("artist", "album", "disk", "track", "song",
-                          "extension"):
-                if not apply_matchers(matchers[field], metadata[field]):
-                    disqualified = True
-                    break
-            if disqualified:
-                continue
-            metadata["from"] = playlist
-            metadata["index"] = index
-            metadata["relpath"] = relpath
-            songs.append(metadata)
-    return metadata
+            offset = get_queue_index(env) if playlist == QUEUE_PLAYLIST else 0
+            for entry_path in playlist_path.iterdir():
+                try:
+                    index = int(entry_path.name)
+                except ValueError:
+                    continue
+                index += offset
+                if not apply_matchers(matchers["index"], index):
+                    continue
+                if not entry_path.is_symlink():
+                    continue
+                song_path = entry_path.resolve()
+                relpath = song_path.relative_to(env["media"])
+                metadata = parse_relpath(relpath)
+                disqualified = False
+                for field in ("artist", "album", "disk", "track", "song",
+                              "extension"):
+                    if not apply_matchers(matchers[field], metadata[field]):
+                        disqualified = True
+                        break
+                if disqualified:
+                    continue
+                metadata["from"] = playlist
+                metadata["index"] = index
+                metadata["relpath"] = relpath
+                songs.append(metadata)
+    return songs
 
 def sort_songs(songs, sorters):
     for sorter in sorters:
@@ -594,29 +662,54 @@ def sort_songs(songs, sorters):
         assert modifier in ("sort", "reverse", "shuffle"), (
             "unexpected sort modifier: {}".format(modifier))
         if modifier == "shuffle":
-            seed1 = random.getrandbits(64)
-            seed2 = random.getrandbits(64)
+            memo = collections.defaultdict(lambda: random.getrandbits(64))
             def key(value):
-                return hash((seed1, value[field], seed2))
+                if field in value:
+                    return memo[value[field]]
+                elif field in METADATA_INT_FIELDS:
+                    return -math.inf
+                else:
+                    return ""
         else:
             def key(value):
-                return value[field]
+                if field in value:
+                    return value[field]
+                elif field in METADATA_INT_FIELDS:
+                    return -math.inf
+                else:
+                    return ""
         reverse = modifier == "reverse"
         songs.sort(key=key, reverse=reverse)
 
 CONTEXT = 3
 
 def song_description(song, index):
-    return ("\n  {}. {} ({}, {})"
-            .format(index, song["song"], song["album"], song["artist"]))
+    return ("\n  [{}]. {}{}{}{} ({}, {})"
+            .format(index,
+                    "{}-".format(song["disk"]) if "disk" in song else "",
+                    song.get("track", ""),
+                    " " if "disk" in song or "track" in song else "",
+                    song["song"], song["album"], song["artist"]))
 
 CONTEXT_DIVIDER = "\n-----"
 
-def insert_in_playlist(env, songs, playlist, index, before, yes):
+def insert_in_playlist(env, songs, playlist, insert_index, before, yes):
+    if not before:
+        insert_index += 1
+    if playlist == MEDIA_PLAYLIST:
+        die("playlist name is reserved for fstunes: {}"
+            .format(MEDIA_PLAYLIST))
     if playlist == QUEUE_PLAYLIST:
         current_index = get_queue_index(env)
-        index += current_index
+        insert_index += current_index
+        global_offset = current_index
+    else:
+        global_offset = 0
     playlist_path = env["playlists"] / playlist
+    if playlist == QUEUE_PLAYLIST:
+        playlist_path.mkdir(parents=True, exist_ok=True)
+    elif not playlist_path.is_dir():
+        die("playlist does not exist: {}".format(playlist))
     existing_indices = []
     for entry_path in playlist_path.iterdir():
         try:
@@ -625,34 +718,35 @@ def insert_in_playlist(env, songs, playlist, index, before, yes):
             continue
         existing_indices.append(index)
     existing_indices.sort()
-    bisect_fn = bisect.bisect_left if before else bisect.bisect_right
-    insertion_point = bisect_fn(index, existing_indices)
+    insertion_point = bisect.bisect_left(existing_indices, insert_index)
     insertion_list = []
     removals = []
     if playlist == QUEUE_PLAYLIST:
-        insertion_point = bisect.bisect_left(current_index, existing_indices)
-        for i in range(insertion_point - env["queue_length"]):
+        removal_point = bisect.bisect_left(existing_indices, current_index)
+        for i in range(removal_point - env["queue_length"]):
             index = existing_indices[i]
             removals.append(playlist_path / str(index))
     for i in range(max(0, insertion_point - CONTEXT), insertion_point):
         index = existing_indices[i]
         song = parse_relpath(
             (playlist_path / str(index)).resolve().relative_to(env["media"]))
-        insertion_list.append(song_description(song, index))
+        insertion_list.append(song_description(song, index - global_offset))
     insertion_list.append(CONTEXT_DIVIDER)
     creates = []
     for offset, song in enumerate(songs):
-        song_index = index + offset
+        song_index = insert_index + offset
         target = pathlib.Path("..") / ".." / MEDIA_PLAYLIST / song["relpath"]
         creates.append((playlist_path / str(song_index), target))
-        insertion_list.append(song_description(song, song_index))
+        insertion_list.append(
+            song_description(song, song_index - global_offset))
     insertion_list.append(CONTEXT_DIVIDER)
     for i in range(insertion_point,
                    min(insertion_point + CONTEXT, len(existing_indices))):
         index = existing_indices[i]
         song = parse_relpath(
             (playlist_path / str(index)).resolve().relative_to(env["media"]))
-        insertion_list.append(song_description(song, index + len(songs)))
+        insertion_list.append(
+            song_description(song, index + len(songs) - global_offset))
     renames = []
     for i in range(insertion_point, len(existing_indices)):
         old_index = existing_indices[i]
@@ -660,14 +754,20 @@ def insert_in_playlist(env, songs, playlist, index, before, yes):
         renames.append((playlist_path / str(old_index),
                         playlist_path / str(new_index)))
     renames.reverse()
+    advance = False
+    if playlist == QUEUE_PLAYLIST:
+        if current_index > insert_index:
+            new_current_index = current_index + len(songs)
+            advance = True
     log(("will insert the following {} song{} into "
          "playlist {} with {} song{} already:{}")
         .format(*pluralens(songs), repr(playlist),
                 *pluralens(existing_indices),
                 "".join(insertion_list)))
-    log("will move {} symlink{}, insert {}, prune {}"
-        .format(*pluralens(renames), len(creates), len(removals)))
-    if not are_you_sure(default=False, yes=yes):
+    log("will move {} symlink{}, insert {}, prune {}{}"
+        .format(*pluralens(renames), len(creates), len(removals),
+                ", advance pointer" if advance else ""))
+    if not are_you_sure(default=True, yes=yes):
         die()
     for removal in removals:
         removal.unlink()
@@ -675,12 +775,20 @@ def insert_in_playlist(env, songs, playlist, index, before, yes):
         rename.rename(target)
     for create, target in creates:
         create.symlink_to(target)
+    if advance:
+        set_queue_index(env, new_current_index)
+    log("inserted {} song{} into playlist {} and pruned {} (length {} -> {})"
+        .format(*pluralens(songs), repr(playlist),
+                len(removals), len(existing_indices),
+                len(existing_indices) + len(songs) - len(removals)))
 
 def insert_songs(
         env, matchers, sorters, playlist, index, transfer, before, yes):
     if transfer:
         raise NotImplementedError
     songs = collect_matched_songs(env, matchers)
+    if not songs:
+        die("no songs matched")
     sort_songs(songs, sorters)
     insert_in_playlist(env, songs, playlist, index, before=before, yes=yes)
 
@@ -712,6 +820,7 @@ def handle_args(args):
         "queue": home / "playlists" / QUEUE_PLAYLIST,
         "queue_current": home / "playlists" / QUEUE_PLAYLIST / "_current",
         "queue_length": queue_length,
+        "temp": home / "temp",
     }
     if args.subcommand == "import":
         import_music(env, args.paths)
@@ -721,10 +830,10 @@ def handle_args(args):
         else:
             delete_playlists(env, args.playlists, yes=args.yes)
     elif args.subcommand == "insert":
-        matchers = parse_matchers(args)
+        matchers = parse_matchers(args, default_to_media=True)
         sorters = parse_sorters(args)
         insert_songs(
-            matchers, sorters, args.playlist, args.index,
+            env, matchers, sorters, args.playlist, args.index,
             transfer=args.transfer, before=args.before, yes=args.yes)
     else:
         raise NotImplementedError
