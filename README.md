@@ -45,7 +45,7 @@ subcommands:
         [    --match-literal FIELD=VALUE]
         [    --match-set FIELD=VALUE1,VALUE2,...]
         [    --match-range FIELD=LOW-HIGH]
-        [    --match-all FIELD]
+        [-M, --match-all FIELD]
         [    --set-delimiter DELIM]
         [    --range-delimiter DELIM]
         [-s, --sort FIELD]
@@ -57,8 +57,8 @@ subcommands:
         PLAYLIST INDEX
 
 `FIELD` may be `artist`, `album`, `disk`, `track`, `song`,
-`extension`, or `from`. Special values for `from` are `media` and
-`queue`.
+`extension`, `from`, or `index`. Special values for `from` are `media`
+and `queue`.
 
 ### remove
 
@@ -67,7 +67,7 @@ subcommands:
         [    --match-literal FIELD=VALUE]
         [    --match-set FIELD=VALUE1,VALUE2,...]
         [    --match-range FIELD=LOW-HIGH]
-        [    --match-all FIELD]
+        [-M, --match-all FIELD]
         [    --set-delimiter DELIM]
         [    --range-delimiter DELIM]
         [-y, --yes]
@@ -79,7 +79,7 @@ subcommands:
         [    --match-literal FIELD=VALUE]
         [    --match-set FIELD=VALUE1,VALUE2,...]
         [    --match-range FIELD=LOW-HIGH]
-        [    --match-all FIELD]
+        [-M, --match-all FIELD]
         [    --set-delimiter DELIM]
         [    --range-delimiter DELIM]
         [-s, --sort FIELD]
@@ -96,7 +96,7 @@ subcommands:
         [    --match-literal FIELD=VALUE]
         [    --match-set FIELD=VALUE1,VALUE2,...]
         [    --match-range FIELD=LOW-HIGH]
-        [    --match-all FIELD]
+        [-M, --match-all FIELD]
         [    --set-delimiter DELIM]
         [    --range-delimiter DELIM]
         [-s, --sort FIELD]
@@ -111,7 +111,7 @@ subcommands:
         [    --match-literal FIELD=VALUE]
         [    --match-set FIELD=VALUE1,VALUE2,...]
         [    --match-range FIELD=LOW-HIGH]
-        [    --match-all FIELD]
+        [-M, --match-all FIELD]
         [    --set-delimiter DELIM]
         [    --range-delimiter DELIM]
         [-y, --yes]
@@ -133,9 +133,11 @@ exist.
                 ALBUM
                     DISK-TRACK SONG.EXTENSION
         playlists
-            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXTENSION
-            ...
-        queue
-            N -> ../media/ARTIST/ALBUM/DISK-TRACK SONG.EXTENSION
+            queue
+                N -> ../../media/ARTIST/ALBUM/DISK-TRACK SONG.EXTENSION
+                ...
+            PLAYLIST
+                N -> ../../media/ARTIST/ALBUM/DISK-TRACK SONG.EXTENSION
+                ...
             ...
         temp
