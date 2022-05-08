@@ -1,7 +1,7 @@
 # Deprecated
 
 I became disillusioned with etunes and decided to work on
-[µTunes](https://github.com/raxod502/utunes) instead.
+[µTunes](https://github.com/radian-software/utunes) instead.
 
 # fstunes
 
